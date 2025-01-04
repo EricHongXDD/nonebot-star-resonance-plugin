@@ -57,3 +57,17 @@ date = fields.DateField(default=date(2000, 1, 1))
 start_time = fields.TimeField(default=time(12, 0, 0))
 is_send = fields.CharField(max_length=32)
 ```
+
+## 缓存文件处理：
+
+### http_temp_solver\separate_img.py
+
+将image文件夹中的文件区分为snapshot、halflength两个文件夹（由于缓存混在一起，所以需要区分头像和资料）
+
+### http_temp_solver\duplicate_removal.py
+
+将从image文件夹中删除image_old文件夹中有的文件（去重，防止重复上传资源）
+
+### http_temp_solver\upload_imgv2.py
+
+将image文件夹中的snapshot、halflength两个文件夹中的图片上传至对应的数据库
