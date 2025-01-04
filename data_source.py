@@ -69,7 +69,7 @@ async def assign_wife_to_user(user_id: str, wife_id: str, snapshot) -> dict:
         if not is_successful:
             return {
                 "status": 'fail',
-                "msg": '糟糕，你的老婆逃走了，试试换一个吧......'
+                "msg": '糟糕，你的配偶逃走了，试试换一个吧......'
             }
 
         # 返回老婆信息
@@ -80,10 +80,10 @@ async def assign_wife_to_user(user_id: str, wife_id: str, snapshot) -> dict:
             "image_data": snapshot.image_data
         }
     except Exception as e:
-        logger.error(f"糟糕，你的老婆逃走了:{e}，试试换一个吧......")
+        logger.error(f"糟糕，你的配偶逃走了:{e}，试试换一个吧......")
         return {
             "status": 'fail',
-            "msg": f"糟糕，你的老婆逃走了:{e}，试试换一个吧......"
+            "msg": f"糟糕，你的配偶逃走了:{e}，试试换一个吧......"
         }
 
 
@@ -97,7 +97,7 @@ async def find_wife_by_qq(user_id: str) -> dict:
         if latest_record and latest_record.date == date.today():
             return {
                 "status": 'fail',
-                "msg": f'今天已经有老婆啦！你老婆在内测时的ID是{latest_record.wife_id}，不能开后宫哦！'
+                "msg": f'今天已经有配偶啦！你配偶在内测时的ID是{latest_record.wife_id}，不能开后宫哦！（也许，也可以做一些别的...？）'
             }
 
         # 随机获取老婆快照
@@ -114,9 +114,9 @@ async def find_wife_by_qq(user_id: str) -> dict:
                     "status": 'same',
                     "msg": [
                         MessageSegment.at(user_id),
-                        f"本来想给你许配的老婆在内测时的ID是{wife_id}，可惜Ta今天已经名花有主属于",
+                        f"本来想给你许配的配偶在内测时的ID是{wife_id}，可惜Ta今天已经名花有主属于",
                         MessageSegment.at(is_others_wife_record.user_id),
-                        '了\n让我给你许配一位新的老婆吧！'
+                        '了\n让我给你许配一位新的配偶吧！'
                     ]
                 }
             # 给用户分配老婆并返回结果
