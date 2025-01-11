@@ -1,7 +1,7 @@
 import random
 from datetime import date
 from typing import List
-from .models import Snapshot, Halflength, DailyWife
+from .models import Snapshot, Halflength, DailyWife, TomorrowEngagement
 from nonebot.log import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment
 
@@ -14,7 +14,8 @@ async def get_snapshot_by_id(id: str) -> List[dict]:
         # 查询 snapshot 中 image_name 字段包含 {id} 的条目
         # snapshots = await Snapshot.filter(image_name__startswith=f"{id}snapshot").values("image_data", "image_name")
         # snapshots = await Snapshot.get_or_create(image_name=f"{id}snapshot")
-        snapshots = await Snapshot.filter(image_name=f"{id}snapshot").values("image_data", "image_id", "image_name")
+        snapshots = await Snapshot.filter(image_name=f"{id}snapshot").values\
+            ("id", "image_data", "image_id", "image_name")
         if snapshots:
             # 使用 'order_by' 排序结果，以 image_id 降序排列
             snapshots_sorted = sorted(snapshots, key=lambda x: x['image_id'], reverse=True)
@@ -34,7 +35,8 @@ async def get_halflength_by_id(id: str) -> List[dict]:
         # 查询 halflength 中 name 字段包含 {id} 的条目
         # halflengths = await Halflength.filter(image_name__startswith=f"{id}halflength").values("image_data", "image_name")
         # halflengths = await Halflength.get_or_create(image_name=f"{id}halflength")
-        halflengths = await Halflength.filter(image_name=f"{id}halflength").values("image_data", "image_id", "image_name")
+        halflengths = await Halflength.filter(image_name=f"{id}halflength").values\
+            ("image_data", "image_id", "image_name")
 
         if halflengths:
             # 使用 'order_by' 排序结果，以 image_id 降序排列
@@ -100,13 +102,37 @@ async def find_wife_by_qq(user_id: str) -> dict:
                 "msg": f'今天已经有配偶啦！你配偶在内测时的ID是{latest_record.wife_id}，不能开后宫哦！（也许，也可以做一些别的...？）'
             }
 
-        # 随机获取老婆快照
-        snapshot = await get_wife_snapshot()
+        # 查询昨日是否订婚
+        object_record = await TomorrowEngagement.get_yesterday_object_record(user_id)
+        if object_record:
+            wife_id = object_record.object_id
+            snapshots = await get_snapshot_by_id(wife_id)
+            if snapshots:
+                snapshot = random.choice(snapshots)
+                id = snapshot['id']
+                snapshot = await Snapshot.filter(id=str(id)).first()
+            else:
+                snapshot = None
+        else:
+            # 随机获取老婆快照
+            snapshot = await get_wife_snapshot()
 
         if snapshot:
             wife_id = snapshot.image_name.split("snapshot")[0]
             # wife_id = '206924'
 
+            # 查询昨日是否已经订婚
+            is_others_object_record = await TomorrowEngagement.check_yesterday_object(wife_id)
+            if is_others_object_record and is_others_object_record.user_id != user_id:
+                return {
+                    "status": 'same',
+                    "msg": [
+                        MessageSegment.at(user_id),
+                        f"本来想给你许配的配偶在内测时的ID是{wife_id}，可惜Ta今天已经和",
+                        MessageSegment.at(is_others_object_record.user_id),
+                        '订婚了\n让我给你许配一位新的配偶吧！'
+                    ]
+                }
             # 查询是否已经是别人老婆
             is_others_wife_record = await DailyWife.check_wife(wife_id)
             if is_others_wife_record:
@@ -153,3 +179,48 @@ async def give_wife_sora(user_id: str) -> dict:
             "status": 'fail',
             "msg": f"查询 207344snapshot 图片时发生错误: {e}"
         }
+
+
+async def engage(qq_id: str, object_id: str) -> dict:
+    """ 随机从 snapshot 表中选取一条数据并返回 base64 编码的 snapshot 图片 """
+    try:
+        # 获取最新的订婚记录
+        latest_record = await TomorrowEngagement.get_latest_object_record(qq_id)
+
+        # 如果今天已经有订婚记录
+        if latest_record and latest_record.date == date.today():
+            return {
+                "status": 'fail',
+                "msg": f'今天已经和对象订婚啦！你对象在内测时的ID是{latest_record.object_id}，不能吃着碗里的还看着锅里的哦！'
+            }
+
+        # 检查对象id是否存在
+        snapshots = await Snapshot.filter(image_name=f"{object_id}snapshot").values("image_data", "image_id", "image_name")
+        if not snapshots:
+            return {
+                "status": 'fail',
+                "msg": f'订婚对象身份ID：{object_id}在数据库中找不到哦！'
+            }
+
+        # 检查对象今日是否已经订婚
+        check_object_record = await TomorrowEngagement.check_object(object_id)
+        if check_object_record:
+            return {
+                "status": 'fail',
+                "msg": f'晚啦！身份ID：{object_id}在今日已经和别人订婚了哦！'
+            }
+
+        # 添加订婚数据
+        await TomorrowEngagement.add_new_object(qq_id, object_id)
+        return {
+            "status": 'success',
+            "msg": f'和对象订婚成功，婚期为明天！你对象在内测时的ID是{object_id}'
+        }
+
+    except Exception as e:
+        logger.error(f"订婚时发生错误: {e}")
+        return {
+            "status": 'fail',
+            "msg": f"订婚时发生错误: {e}"
+        }
+

@@ -11,8 +11,9 @@ from nonebot.rule import to_me
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_tortoise_orm import add_model
 from .service import Service
-from .models import DailyWife, DailyChildren
-from .data_source import get_snapshot_by_id, get_halflength_by_id, find_wife_by_qq, give_wife_sora, get_wife_snapshot
+from .models import DailyWife, DailyChildren, TomorrowEngagement
+from .data_source import get_snapshot_by_id, get_halflength_by_id, find_wife_by_qq, give_wife_sora, get_wife_snapshot, \
+    engage
 
 # 插件元数据
 __plugin_meta__ = PluginMetadata(
@@ -34,9 +35,10 @@ get_relation = on_regex("查询子女", priority=5, block=True, rule=to_me())
 # 注册今日配偶事件
 daily_wife_husband_triggers = ['今日老婆','今日老公','今日配偶']
 daily_wife_husband_events = [
-    on_fullmatch(trigger.strip(), priority=5, block=False) for trigger in daily_wife_husband_triggers
+    on_fullmatch(trigger.strip(), priority=5, block=True, rule=to_me()) for trigger in daily_wife_husband_triggers
 ]
-
+# 注册订婚事件
+tomorrow_engagement = on_regex("订婚", priority=5, block=True, rule=to_me())
 
 for find_wife in daily_wife_husband_events:
     @find_wife.handle()
@@ -374,3 +376,39 @@ async def _(event: MessageEvent):
     messages.append(MessageSegment.image(BytesIO(relation_pic)))
     await get_relation.finish(Message(messages))
 
+
+@tomorrow_engagement.handle()
+async def _(event: MessageEvent):
+    """ 订婚处理函数 """
+    qq_id = str(event.user_id)
+    msg = str(event.get_message()).strip().replace(' ', '')
+
+    # 提取用户ID并验证
+    try:
+        object_id = msg.split('订婚')[1].strip()
+    except IndexError:
+        messages = [
+            MessageSegment.at(qq_id),
+            f"请提供用户ID，例如：订婚1234"
+        ]
+        await tomorrow_engagement.finish(Message(messages))
+        return
+
+    if not object_id.isdigit():
+        messages = [
+            MessageSegment.at(qq_id),
+            "用户ID格式不正确"
+        ]
+        await tomorrow_engagement.finish(Message(messages))
+        return
+
+    # 订婚处理
+    result = await engage(qq_id, object_id)
+    msg = result['msg']
+    # 返回消息
+    messages = [
+        MessageSegment.at(qq_id),
+        f"{msg}"
+    ]
+    await tomorrow_engagement.finish(Message(messages))
+    return

@@ -1,6 +1,6 @@
 from tortoise import fields, Tortoise
 from tortoise.models import Model
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 
 
 class Snapshot(Model):
@@ -228,3 +228,71 @@ class DailyChildren(Model):
             # 如果出现异常，打印错误并返回 False
             print(f"更新失败: {e}")
             return False
+
+
+class TomorrowEngagement(Model):
+    id = fields.IntField(pk=True, generated=True)
+    user_id = fields.CharField(max_length=32)
+    object_id = fields.CharField(max_length=32)
+    date = fields.DateField(default=date(2000, 1, 1))
+
+    class Meta:
+        table = "tomorrow_engagement"
+        table_description = "明日订婚表"
+
+    @classmethod
+    async def get_latest_object_record(cls, user_id: str):
+        """
+        检查给定 user_id 对应的记录
+        :param user_id: 用户 ID
+        :return: 返回 latest_record
+        """
+        # 获取该 user_id 对应的最新记录
+        latest_record = await TomorrowEngagement.filter(user_id=user_id).order_by('-date').first()
+        return latest_record
+
+    @classmethod
+    async def add_new_object(cls, user_id: str, object_id: str) -> bool:
+        """
+        插入一条新的订婚记录，日期为今天
+        :param user_id: 用户 ID
+        :param object_id: 对象的 ID
+        :return: 插入成功返回 True，失败返回 False
+        """
+        # 使用 create 方法插入一条新记录
+        await TomorrowEngagement.create(user_id=user_id, object_id=object_id, date=date.today())
+        return True
+
+    @classmethod
+    async def check_object(cls, object_id: str):
+        """
+        查找对象订婚记录，日期为今天
+        :param object_id: 对象的 ID
+        :return: check_object
+        """
+        check_object_record = await TomorrowEngagement.filter(object_id=object_id, date=date.today()).first()
+        return check_object_record
+
+    @classmethod
+    async def check_yesterday_object(cls, object_id: str):
+        """
+        查找对象订婚记录，日期为昨天
+        :param object_id: 对象的 ID
+        :return: check_object
+        """
+        # 获取昨天的日期
+        yesterday = (date.today() - timedelta(days=1))
+        check_object_record = await TomorrowEngagement.filter(object_id=object_id, date=yesterday).first()
+        return check_object_record
+
+    @classmethod
+    async def get_yesterday_object_record(cls, user_id: str):
+        """
+        检查给定 user_id 对应的昨日记录
+        :param user_id: 用户 ID
+        :return: 返回 yesterday_record
+        """
+        # 获取昨天的日期
+        yesterday = (date.today() - timedelta(days=1))
+        yesterday_record = await TomorrowEngagement.filter(user_id=user_id, date=yesterday).first()
+        return yesterday_record
