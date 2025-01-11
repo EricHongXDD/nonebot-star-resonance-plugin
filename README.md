@@ -11,6 +11,7 @@
 3. 今日老婆 | 今日老公 | 今日配偶
 4. 生儿育女
 5. 查询子女
+6. 订婚 `{用户id}`
 
 > 注：
 > - 第 4 项功能需要先进行第 3 项操作。
@@ -56,6 +57,14 @@ my_granddaughter2_id = fields.CharField(max_length=255)
 date = fields.DateField(default=date(2000, 1, 1))
 start_time = fields.TimeField(default=time(12, 0, 0))
 is_send = fields.CharField(max_length=32)
+```
+
+### tomorrow_engagement
+```python
+id = fields.IntField(pk=True, generated=True)
+user_id = fields.CharField(max_length=32)
+object_id = fields.CharField(max_length=32)
+date = fields.DateField(default=date(2000, 1, 1))
 ```
 
 ## 缓存文件处理：
