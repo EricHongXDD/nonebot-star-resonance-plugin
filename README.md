@@ -12,6 +12,7 @@
 4. 生儿育女
 5. 查询子女
 6. 订婚 `{用户id}`
+7. 生成视频 `{用户id}` `{视频名}`
 
 > 注：
 > - 第 4 项功能需要先进行第 3 项操作。
@@ -25,6 +26,7 @@ id = fields.IntField(pk=True, generated=True)
 image_name = fields.CharField(max_length=255)
 image_id = fields.CharField(max_length=255)
 image_data = fields.BinaryField()  # 使用 BinaryField 来存储二进制数据（例如图片）
+
 ```
 
 ### halflengthV2
@@ -33,6 +35,7 @@ id = fields.IntField(pk=True, generated=True)
 image_name = fields.CharField(max_length=255)
 image_id = fields.CharField(max_length=255)
 image_data = fields.BinaryField()  # 使用 BinaryField 来存储二进制数据（例如图片）
+sex = fields.CharField(max_length=4)
 ```
 
 ### daily_wife
