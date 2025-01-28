@@ -1,4 +1,8 @@
+import os
+
 from tortoise import fields, Tortoise
+from tortoise.fields import Field
+from tortoise.fields.base import VALUE
 from tortoise.models import Model
 from datetime import date, time, datetime, timedelta
 
@@ -8,6 +12,7 @@ class Snapshot(Model):
     image_name = fields.CharField(max_length=255)
     image_id = fields.CharField(max_length=255)
     image_data = fields.BinaryField()  # 使用 BinaryField 来存储二进制数据（例如图片）
+    sex = fields.CharField(max_length=4)
 
     class Meta:
         table = "snapshotV2"  # 表名为 snapshot
@@ -296,3 +301,120 @@ class TomorrowEngagement(Model):
         yesterday = (date.today() - timedelta(days=1))
         yesterday_record = await TomorrowEngagement.filter(user_id=user_id, date=yesterday).first()
         return yesterday_record
+
+
+class ViggleVideo(Model):
+    id = fields.IntField(pk=True, generated=True)
+    task_id = fields.CharField(max_length=64)
+    file_name = fields.CharField(max_length=64)
+    date = fields.DateField(default=date(2000, 1, 1))
+    time = fields.TimeField(default=time(12, 0, 0))
+
+    class Meta:
+        table = "viggle_video"
+        table_description = "ViggleVideo表"
+
+    @classmethod
+    async def add_new_record(cls, task_id: str, file_name: str) -> bool:
+        """
+        插入一条新的video上传记录
+        :return: 插入完成后返回True
+        """
+        # 使用 create 方法插入一条新记录
+        upload_time = datetime.now().time().strftime('%H:%M:%S')
+        # 尝试查找是否已经有记录
+        existing_record = await ViggleVideo.filter(file_name=file_name).first()
+
+        if existing_record:
+            # 如果记录已经存在，更新该记录
+            await existing_record.update_from_dict({
+                'task_id': task_id,
+                'date': date.today(),
+                'time': upload_time
+            })
+        else:
+            # 如果没有记录，创建一条新记录
+            await ViggleVideo.create(
+                task_id=task_id,
+                file_name=file_name,
+                date=date.today(),
+                time=upload_time
+            )
+
+        return True
+    @classmethod
+    async def check_record(cls, file_name: str) -> bool:
+        """
+        检查file_name上传时间是否>=12小时
+        :return: >=12小时返回False，否则返回True
+        """
+        # 查询指定 file_name 的记录
+        record = await ViggleVideo.filter(file_name=file_name).first()
+        # 如果记录不存在，返回 False （因为没有记录上传时间）
+        if not record:
+            return False
+        # 获取当前时间
+        current_time = datetime.now().time()
+        current_datetime = datetime.combine(date.today(), current_time)
+
+        # 检查 record.time 是否是 datetime.time 类型
+        if isinstance(record.time, timedelta):
+            # 如果是 timedelta 类型，转换为 time 类型（假设 time 是从零点开始）
+            record_time = (datetime.min + record.time).time()
+        else:
+            # 如果 record.time 本身是 time 类型，直接使用
+            record_time = record.time
+
+        # 获取上传时间
+        record_datetime = datetime.combine(record.date, record_time)
+
+        # 检查上传时间是否>=12小时
+        # if (current_datetime - record_datetime) >= timedelta(hours=12):
+        #     return False
+        return True
+
+    @classmethod
+    async def query_task_id(cls, file_name: str) -> Field[VALUE] | VALUE | None:
+        """
+        通过file_name查询task_id
+        :return: 查询成功返回task_id，否则返回None
+        """
+        # 查询指定 file_name 的记录
+        record = await ViggleVideo.filter(file_name=file_name).first()
+
+        # 如果找到记录，则返回 task_id
+        if record:
+            return record.task_id
+        # 如果没有找到记录，返回 None
+        return None
+
+    @classmethod
+    async def check_filename_exist(cls, file_name: str) -> bool:
+        """
+        检查filename字段值是否存在（忽略后缀）
+        :return: 查询存在返回True，否则返回False
+        """
+        # 获取不带扩展名的文件名
+        base_name = os.path.splitext(file_name)[0]
+
+        # 查询数据库中所有文件名，不带扩展名后进行比对
+        records = await ViggleVideo.filter(file_name__startswith=base_name).all()
+
+        # 如果找到任何记录，表示存在匹配的文件名（忽略后缀）
+        if records:
+            return True
+        return False
+
+    @classmethod
+    async def query_filename(cls) -> list:
+        """
+        查询数据库中所有filename列表（不返回后缀名）
+        :return: filename列表
+        """
+        # 查询数据库中的所有 file_name 字段
+        records = await ViggleVideo.all()
+
+        # 获取所有去掉扩展名的 file_name
+        file_names = [os.path.splitext(record.file_name)[0] for record in records]
+
+        return file_names

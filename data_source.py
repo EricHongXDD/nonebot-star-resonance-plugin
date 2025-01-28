@@ -1,9 +1,14 @@
+import asyncio
+import os
 import random
+import time
 from datetime import date
 from typing import List
-from .models import Snapshot, Halflength, DailyWife, TomorrowEngagement
+from .models import Snapshot, Halflength, DailyWife, TomorrowEngagement, ViggleVideo
 from nonebot.log import logger
 from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment
+from .service import Service
+base_path = os.path.dirname(os.path.abspath(__file__))  # 获取当前文件的绝对路径
 
 
 async def get_snapshot_by_id(id: str) -> List[dict]:
@@ -36,7 +41,7 @@ async def get_halflength_by_id(id: str) -> List[dict]:
         # halflengths = await Halflength.filter(image_name__startswith=f"{id}halflength").values("image_data", "image_name")
         # halflengths = await Halflength.get_or_create(image_name=f"{id}halflength")
         halflengths = await Halflength.filter(image_name=f"{id}halflength").values\
-            ("image_data", "image_id", "image_name")
+            ("id", "image_data", "image_id", "image_name")
 
         if halflengths:
             # 使用 'order_by' 排序结果，以 image_id 降序排列
@@ -49,16 +54,27 @@ async def get_halflength_by_id(id: str) -> List[dict]:
         return []
 
 
-async def get_wife_snapshot():
+async def get_wife_snapshot(sex=3):
     """ 获取随机老婆的快照，封装了查询逻辑 """
     # 获取 snapshot 表的最大 ID
     max_id = await Snapshot.get_max_id()
     snapshot = None
 
-    # 循环直到查询到一个有效的 snapshot
+    # 循环直到查询到一个符合条件的 snapshot
     while snapshot is None:
         random_id = random.randint(1, max_id)
-        snapshot = await Snapshot.filter(id=str(random_id)).first()
+
+        if sex == 3:
+            # sex 为 3，表示没有性别限制，查询时不加 sex 条件
+            snapshot = await Snapshot.filter(id=str(random_id)).first()
+        else:
+            # sex 不为 3，查询时加上 sex 条件
+            sex = str(sex)
+            snapshot = await Snapshot.filter(id=str(random_id), sex=sex).first()
+
+        # 如果没有符合条件的 snapshot，继续循环
+        if snapshot is None:
+            continue
 
     return snapshot
 
@@ -89,7 +105,7 @@ async def assign_wife_to_user(user_id: str, wife_id: str, snapshot) -> dict:
         }
 
 
-async def find_wife_by_qq(user_id: str) -> dict:
+async def find_wife_by_qq(user_id: str, sex: int) -> dict:
     """ 随机从 snapshot 表中选取一条数据并返回 base64 编码的 snapshot 图片 """
     try:
         # 获取最新的老婆记录
@@ -115,7 +131,7 @@ async def find_wife_by_qq(user_id: str) -> dict:
                 snapshot = None
         else:
             # 随机获取老婆快照
-            snapshot = await get_wife_snapshot()
+            snapshot = await get_wife_snapshot(sex)
 
         if snapshot:
             wife_id = snapshot.image_name.split("snapshot")[0]
@@ -223,4 +239,83 @@ async def engage(qq_id: str, object_id: str) -> dict:
             "status": 'fail',
             "msg": f"订婚时发生错误: {e}"
         }
+
+
+async def upload_viggle_video(filename: str):
+    filename = filename + '.mp4'
+    if await ViggleVideo.check_record(filename):
+        video_task_id = await ViggleVideo.query_task_id(filename)
+    else:
+        s = Service()
+        file_data = os.path.join(base_path, filename)
+        video_task_id = await s.upload_viggle_video(file_data)
+        await ViggleVideo.add_new_record(video_task_id, filename)
+
+    return video_task_id
+
+
+async def query_viggle_result(task_id: str):
+    s = Service()
+    result = await s.query_viggle_result(task_id)
+    n = 1
+    while result is None:
+        n += 1
+        print(f"第{n}次查询结果")
+        await asyncio.sleep(15)
+        print(f"任务未完成，15秒后继续")
+        result = await s.query_viggle_result(task_id)
+
+    return result
+
+
+async def generate_viggle_video(user_id: str, video_name: str):
+    """ 使用viggle生成视频 """
+    s = Service()
+    # 获取图片data
+    halflengths = await get_halflength_by_id(user_id)
+    if halflengths:
+        halflength = random.choice(halflengths)
+        id = halflength['id']
+        image_name = halflength['image_name']
+        image_data = halflength['image_data']
+    else:
+        return {
+            'success': False,
+            'msg': f'未找到ID：{user_id}的全身照，欢迎贡献文件夹增加数据~（该文件夹一般会隐藏，可通过路径访问）C:\\Users\\改为实际用户名\\AppData\\Local\\Temp\\bokura\\Star\\http'
+        }
+
+    # 上传图片获取id
+    image_task_id = await s.upload_viggle_image(image_name, image_data)
+
+    # 获取视频id
+    if not await ViggleVideo.check_filename_exist(video_name):
+        return {
+            'success': False,
+            'msg': f'未找到模板：{video_name}，可输入指令查看全部模板。（指令：查询viggle模板）'
+        }
+    video_task_id = await upload_viggle_video(video_name)
+    if video_task_id is None:
+        return {
+            'success': False,
+            'msg': f'生成视频-上传图片出现内部错误，请重试'
+        }
+    # 生成视频，获取result_task_id
+    result_task_id = await s.start_viggle_generation(image_task_id, video_task_id)
+    if result_task_id is None:
+        return {
+            'success': False,
+            'msg': f'生成视频-mix出现内部错误，请重试'
+        }
+    # 获取result_url
+    result_url = await query_viggle_result(result_task_id)
+
+    # 获取video_data
+    video_data = await s.download_viggle_file(result_url)
+
+    return {
+        'success': True,
+        'msg': f'viggle生成成功',
+        'data': video_data
+    }
+
 

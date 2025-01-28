@@ -1,6 +1,7 @@
 import os
 import base64
 import random
+import re
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from nonebot import on_command, on_fullmatch
@@ -11,9 +12,9 @@ from nonebot.rule import to_me
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_tortoise_orm import add_model
 from .service import Service
-from .models import DailyWife, DailyChildren, TomorrowEngagement
+from .models import DailyWife, DailyChildren, TomorrowEngagement, ViggleVideo
 from .data_source import get_snapshot_by_id, get_halflength_by_id, find_wife_by_qq, give_wife_sora, get_wife_snapshot, \
-    engage
+    engage, generate_viggle_video
 
 # 插件元数据
 __plugin_meta__ = PluginMetadata(
@@ -27,27 +28,37 @@ add_model("plugins.send_bpm_pic.models")
 
 
 # 查询指令
-send_snapshot = on_regex("查询头像", priority=5, block=True, rule=to_me())
-send_halflength = on_regex("查询资料", priority=5, block=True, rule=to_me())
-# find_wife = on_regex("今日老婆", priority=5, block=True, rule=to_me())
-having_children = on_regex("生儿育女", priority=5, block=True, rule=to_me())
-get_relation = on_regex("查询子女", priority=5, block=True, rule=to_me())
+send_snapshot = on_regex("查询头像", priority=5, block=False, rule=to_me())
+send_halflength = on_regex("查询资料", priority=5, block=False, rule=to_me())
+# find_wife = on_regex("今日老婆", priority=5, block=False, rule=to_me())
+having_children = on_regex("生儿育女", priority=5, block=False, rule=to_me())
+get_relation = on_regex("查询子女", priority=5, block=False, rule=to_me())
+viggle_generation = on_regex("生成视频", priority=5, block=False, rule=to_me())
+query_viggle_model = on_regex("查询viggle模板", priority=5, block=False, rule=to_me())
+
 # 注册今日配偶事件
 daily_wife_husband_triggers = ['今日老婆','今日老公','今日配偶']
 daily_wife_husband_events = [
-    on_fullmatch(trigger.strip(), priority=5, block=True, rule=to_me()) for trigger in daily_wife_husband_triggers
+    on_fullmatch(trigger.strip(), priority=5, block=False, rule=to_me()) for trigger in daily_wife_husband_triggers
 ]
 # 注册订婚事件
-tomorrow_engagement = on_regex("订婚", priority=5, block=True, rule=to_me())
+tomorrow_engagement = on_regex("订婚", priority=5, block=False, rule=to_me())
 
 for find_wife in daily_wife_husband_events:
     @find_wife.handle()
     async def _(event: MessageEvent):
+        msg = str(event.get_message()).strip().replace(' ', '')
+        if '老婆' in msg:
+            sex = 0
+        elif '老公' in msg:
+            sex = 1
+        else:
+            sex = 3
         # 用户 ID (字符串类型，用于 @)
         user_id = str(event.user_id)
 
         # 获取数据库中的图片
-        data = await find_wife_by_qq(user_id)
+        data = await find_wife_by_qq(user_id, sex)
         status = data.get("status")
 
         if status == 'success':
@@ -411,4 +422,77 @@ async def _(event: MessageEvent):
         f"{msg}"
     ]
     await tomorrow_engagement.finish(Message(messages))
+    return
+
+
+@viggle_generation.handle()
+async def _(event:   MessageEvent):
+    """ 生成视频处理函数 """
+    qq_id = str(event.user_id)
+    msg = str(event.get_message()).strip().replace(' ', '')
+
+    # 提取用户ID并验证
+    try:
+        command = msg.split('生成视频')[1].strip()
+        # 使用正则表达式来分割数字和中文部分
+        match = re.match(r"(\d+)(.*)", command)
+        # 提取数字部分和文本部分
+        user_id = match.group(1)
+        video_name = match.group(2)
+    except IndexError:
+        messages = [
+            MessageSegment.at(qq_id),
+            f"请输入正确的指令格式，例如：生成视频1234陪我过个冬"
+        ]
+        await viggle_generation.finish(Message(messages))
+        return
+
+    if not user_id.isdigit():
+        messages = [
+            MessageSegment.at(qq_id),
+            "用户ID格式不正确"
+        ]
+        await viggle_generation.finish(Message(messages))
+        return
+
+    messages = [
+        MessageSegment.at(qq_id),
+        "视频正在生成中，耗时较长请耐心等待哦~"
+    ]
+    await viggle_generation.send(Message(messages))
+
+    # 生成视频处理
+    result = await generate_viggle_video(user_id, video_name)
+    msg = result['msg']
+    success = result['success']
+    if not success:
+        # 返回消息
+        messages = [
+            MessageSegment.at(qq_id),
+            f"生成失败：{msg}"
+        ]
+    else:
+        video_data = result['data']
+        # 返回消息
+        messages = [
+            MessageSegment.at(qq_id),
+            MessageSegment.video(BytesIO(video_data))
+        ]
+
+    await viggle_generation.finish(Message(messages))
+    return
+
+
+@query_viggle_model.handle()
+async def _(event:   MessageEvent):
+    """ 查询viggle模板处理函数 """
+    qq_id = str(event.user_id)
+    file_names = await ViggleVideo.query_filename()
+    file_name = '、'.join(file_names)
+    msg = '目前可选择的viggle模板如下：\n' + file_name
+    messages = [
+        MessageSegment.at(qq_id),
+        msg
+    ]
+    await query_viggle_model.finish(Message(messages))
     return
