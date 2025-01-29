@@ -339,19 +339,19 @@ async def _(event: MessageEvent):
     # 动态调整称呼
     if random_sex == 0:  # 如果是女性
         if my_daughter_prefix == '女儿':
-            my_daughter_wife_prefix = '女婿a'
-            my_daughter_prefix = '女儿a'
-            my_daughter2_wife_prefix = '女婿b'
-            my_daughter2_prefix = '女儿b'
+            my_daughter_wife_prefix = '女婿A'
+            my_daughter_prefix = '女儿A'
+            my_daughter2_wife_prefix = '女婿B'
+            my_daughter2_prefix = '女儿B'
         else:
             my_daughter2_wife_prefix = '女婿'
             my_daughter2_prefix = '女儿'
     else:  # 如果是男性
         if my_daughter_prefix == '儿子':
-            my_daughter_wife_prefix = '儿媳a'
-            my_daughter_prefix = '儿子a'
-            my_daughter2_wife_prefix = '儿媳b'
-            my_daughter2_prefix = '儿子b'
+            my_daughter_wife_prefix = '儿媳A'
+            my_daughter_prefix = '儿子A'
+            my_daughter2_wife_prefix = '儿媳B'
+            my_daughter2_prefix = '儿子B'
         else:
             my_daughter2_wife_prefix = '儿媳'
             my_daughter2_prefix = '儿子'
@@ -383,27 +383,27 @@ async def _(event: MessageEvent):
     if random_sex == 0:  # 如果是女性
         if '女儿' in my_daughter2_prefix:
             if my_granddaughter_prefix == '外孙女':
-                my_granddaughter_prefix = '外孙女a'
-                my_granddaughter2_prefix = '外孙女b'
+                my_granddaughter_prefix = '外孙女A'
+                my_granddaughter2_prefix = '外孙女B'
             else:
                 my_granddaughter2_prefix = '外孙女'
         else:
             if my_granddaughter_prefix == '孙女':
-                my_granddaughter_prefix = '孙女a'
-                my_granddaughter2_prefix = '孙女b'
+                my_granddaughter_prefix = '孙女A'
+                my_granddaughter2_prefix = '孙女B'
             else:
                 my_granddaughter2_prefix = '孙女'
     else:  # 如果是男性
         if '女儿' in my_daughter2_prefix:
             if my_granddaughter_prefix == '外孙子':
-                my_granddaughter_prefix = '外孙子a'
-                my_granddaughter2_prefix = '外孙子b'
+                my_granddaughter_prefix = '外孙子A'
+                my_granddaughter2_prefix = '外孙子B'
             else:
                 my_granddaughter2_prefix = '外孙子'
         else:
             if my_granddaughter_prefix == '孙子':
-                my_granddaughter_prefix = '孙子a'
-                my_granddaughter2_prefix = '孙子b'
+                my_granddaughter_prefix = '孙子A'
+                my_granddaughter2_prefix = '孙子B'
             else:
                 my_granddaughter2_prefix = '孙子'
 
@@ -420,7 +420,8 @@ async def _(event: MessageEvent):
     avatar_data.append(my_granddaughter_avatar)
     avatar_data.append(my_granddaughter2_avatar)
 
-    relation_pic = await s.process_image(avatar_data, user_name)
+    text_data = [str(user_name), "配偶", my_daughter_wife_prefix, my_daughter_prefix, my_daughter2_prefix, my_daughter2_wife_prefix, my_granddaughter_prefix, my_granddaughter2_prefix]
+    relation_pic = await s.process_image(avatar_data, text_data)
     avatar_desc = f'祝贺你喜添家丁！你的家庭成员具体ID如下：\n' \
                   f'配偶：{my_wife_id}\n' \
                   f'{my_daughter_wife_prefix}：{my_daughter_wife_id}\n' \

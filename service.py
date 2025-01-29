@@ -11,7 +11,7 @@ from io import BytesIO
 import os
 from . import headers
 base_path = os.path.dirname(os.path.abspath(__file__))  # 获取当前文件的绝对路径
-image_path = os.path.join(base_path, 'image', 'relation_model.png')
+image_path = os.path.join(base_path, 'image', 'relation_model2.png')
 
 
 def get_default_avatar(default_avatar_path: str):
@@ -75,18 +75,70 @@ class Service(object):
             print(f"下载图片时发生错误: {e}, 使用默认头像。")
             return get_default_avatar(default_avatar_path)
 
-    async def process_image(self, image_files_data, text, font_path=os.path.join(base_path, 'font', 'Alibaba-PuHuiTi-Medium.ttf'), font_size=50):
+    async def add_vertical_text(self, image, text, position, font_path=os.path.join(base_path, 'font', 'Alibaba-PuHuiTi-Medium.ttf'), font_size=80):
+        """
+        在提供的 PIL.Image 图片上添加 **竖排文字**，**确保中英数字垂直间距均匀**，并返回修改后的图片对象。
+        :param font_size: 字体大小
+        :param image: PIL.Image 对象
+        :param text: 需要添加的文字 (str)
+        :param position: (左上角坐标, 右下角坐标) -> ((x1, y1), (x2, y2))
+        :param font_path: 字体文件路径
+        :return: 修改后的 PIL.Image 对象
+        """
+        if not isinstance(image, Image.Image):
+            raise TypeError("image 必须是 PIL.Image 对象")
+
+        draw = ImageDraw.Draw(image)
+        (text_left, text_top), (text_right, text_bottom) = position
+        area_width = text_right - text_left
+        area_height = text_bottom - text_top
+
+        # 初始字体大小
+        font = ImageFont.truetype(font_path, font_size)
+
+        # **计算最大字符高度** 作为标准
+        while True:
+            char_heights = [draw.textbbox((0, 0), c, font=font)[3] - draw.textbbox((0, 0), c, font=font)[1] for c in text]
+            max_char_height = max(char_heights)  # 取最大字符高度
+            total_height = len(text) * max_char_height * 1.1  # 额外加 10% 间距
+
+            # 计算最大字符宽度
+            bbox = draw.textbbox((0, 0), text[0], font=font)
+            max_char_width = bbox[2] - bbox[0]
+
+            if total_height <= area_height and max_char_width <= area_width:
+                break  # 字体大小合适
+            font_size -= 1
+            if font_size < 10:  # 字体过小时停止调整
+                break
+            font = ImageFont.truetype(font_path, font_size)
+
+        # 计算文本的起始位置（**确保垂直居中**）
+        text_x = (text_left + text_right - max_char_width) // 2
+        text_y_start = (text_bottom + text_top - total_height) // 2
+
+        # **绘制竖排文字**
+        for i, char in enumerate(text):
+            text_y = text_y_start + i * max_char_height * 1.1  # 统一使用 `max_char_height` + 10% 间距
+            bbox = draw.textbbox((0, 0), char, font=font)
+            char_width = bbox[2] - bbox[0]
+
+            # **确保英文字母和数字水平居中**
+            offset_x = (max_char_width - char_width) // 2  # 计算水平居中偏移量
+            draw.text((text_x + offset_x, text_y), char, font=font, fill=(0, 0, 0))
+
+        return image  # 返回修改后的 PIL.Image 对象
+
+    async def process_image(self, image_files_data, text_data):
         """
         处理图像并添加竖排文字，返回最终图像的二进制数据。
 
+        :param text_data: 文字列表
         :param image_files_data: 包含a.png~h.png的二进制数据的列表，顺序为a.png, b.png, c.png, d.png, e.png, f.png, g.png, h.png
-        :param text: 要添加的竖排文字
-        :param font_path: 字体文件路径，默认是'Alibaba-PuHuiTi-Medium.ttf'
-        :param font_size: 初始字体大小，默认是50
         :return: 图像的二进制数据
         """
         # 打开背景
-        background = Image.open(os.path.join(base_path, 'image', 'relation_model.png'))
+        background = Image.open(os.path.join(base_path, 'image', 'relation_model2.png'))
 
         # 8个方块的位置 (左上角和右下角坐标)
         positions = [
@@ -115,45 +167,21 @@ class Service(object):
             # 将调整后的图像粘贴到背景图上
             background.paste(img_resized, left_top)
 
-        # 创建一个ImageDraw对象
-        draw = ImageDraw.Draw(background)
+        # 8个文本区域（左上角坐标, 右下角坐标）
+        text_areas = [
+            ((474, 78), (551, 371)),  # 第1个区域
+            ((909, 78), (986, 371)),  # 第2个区域
+            ((42, 583), (119, 876)),  # 第3个区域
+            ((474, 583), (551, 876)),  # 第4个区域
+            ((908, 583), (985, 876)),  # 第5个区域
+            ((1340, 583), (1417, 876)),  # 第6个区域
+            ((256, 1087), (333, 1380)),  # 第7个区域
+            ((1123, 1087), (1200, 1380))  # 第8个区域
+        ]
 
-        # 计算给定区域的高度
-        text_left = 479
-        text_top = 11
-        text_right = 546
-        text_bottom = 435
-        area_height = text_bottom - text_top
-
-        # 先加载字体，计算每个字符的大小
-        font = ImageFont.truetype(font_path, font_size)
-
-        # 获取第一个字符的边界框
-        bbox = draw.textbbox((0, 0), text[0], font=font)  # 以第一个字符为例
-        char_width = bbox[2] - bbox[0]  # 计算字符的宽度
-        char_height = bbox[3] - bbox[1]  # 计算字符的高度
-
-        # 计算竖排文字的总高度
-        total_height = len(text) * char_height  # 竖排文字的总高度
-
-        # 如果竖排文字的总高度超出区域高度，调整字体大小
-        while total_height > area_height:
-            font_size -= 1  # 减小字体大小
-            if font_size < 10:  # 防止字体过小
-                break
-            font = ImageFont.truetype(font_path, font_size)  # 更新字体大小
-            bbox = draw.textbbox((0, 0), text[0], font=font)
-            char_height = bbox[3] - bbox[1]  # 更新字符高度
-            total_height = len(text) * char_height  # 更新总高度
-
-        # 计算竖排文字的起始位置，水平居中，垂直居中
-        text_x = (text_right + text_left - char_width) // 2  # 水平居中
-        text_y_start = (text_bottom + text_top - total_height) // 2  # 垂直居中
-
-        # 绘制竖排文字，每个字符垂直排列
-        for i, char in enumerate(text):
-            text_y = text_y_start + i * char_height  # 每个字符之间的垂直间距
-            draw.text((text_x, text_y), char, font=font, fill=(255, 255, 255))  # 白色文字
+        # 依次在8个区域添加不同的文字
+        for text, text_area in zip(text_data, text_areas):
+            background = await self.add_vertical_text(background, text, text_area)
 
         # 使用BytesIO保存最终图像并返回二进制数据
         output_image = BytesIO()
