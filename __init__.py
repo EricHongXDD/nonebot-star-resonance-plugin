@@ -269,8 +269,8 @@ async def _(event: MessageEvent):
         messages.append('今天已经发送过你的家庭成员信息啦~要好好记住哦！')
         await get_relation.finish(Message(messages))
 
-    # 继续判断现在时间-创建时间是否大于1小时
-    # 如果时间小于1小时，直接结束事件
+    # 继续判断现在时间-创建时间是否大于wait_time分钟
+    # 如果时间小于wait_time分钟，直接结束事件
     start_time = latest_relation_record.start_time
     # 当前时间
     current_time = datetime.now()
@@ -306,29 +306,107 @@ async def _(event: MessageEvent):
         my_wife_avatar = bpm_pics[0]["image_data"] if bpm_pics else None
 
     # 3、获取其他亲属关系头像、id
-    my_daughter_wife_snapshot = await get_wife_snapshot()
+    # 随机获取性别
+    random_sex = random.randint(0, 1)
+    # 如果random_sex是0，reverse_sex是1；如果random_sex是1，reverse_sex是0
+    reverse_sex = 1 - random_sex
+    my_daughter_wife_snapshot = await get_wife_snapshot(sex=reverse_sex)
     my_daughter_wife_avatar = my_daughter_wife_snapshot.image_data
     my_daughter_wife_id = my_daughter_wife_snapshot.image_name.split("snapshot")[0]
 
-    my_daughter_snapshot = await get_wife_snapshot()
+    my_daughter_snapshot = await get_wife_snapshot(sex=random_sex)
     my_daughter_avatar = my_daughter_snapshot.image_data
     my_daughter_id = my_daughter_snapshot.image_name.split("snapshot")[0]
+    # 动态调整称呼
+    if random_sex == 0:  # 如果是女性
+        my_daughter_wife_prefix = '女婿'
+        my_daughter_prefix = '女儿'
+    else:  # 如果是男性
+        my_daughter_wife_prefix = '儿媳'
+        my_daughter_prefix = '儿子'
 
-    my_daughter2_snapshot = await get_wife_snapshot()
+    # 随机获取性别
+    random_sex = random.randint(0, 1)
+    # 如果random_sex是0，reverse_sex是1；如果random_sex是1，reverse_sex是0
+    reverse_sex = 1 - random_sex
+    my_daughter2_snapshot = await get_wife_snapshot(sex=random_sex)
     my_daughter2_avatar = my_daughter2_snapshot.image_data
     my_daughter2_id = my_daughter2_snapshot.image_name.split("snapshot")[0]
 
-    my_daughter2_wife_snapshot = await get_wife_snapshot()
+    my_daughter2_wife_snapshot = await get_wife_snapshot(sex=reverse_sex)
     my_daughter2_wife_avatar = my_daughter2_wife_snapshot.image_data
     my_daughter2_wife_id = my_daughter2_wife_snapshot.image_name.split("snapshot")[0]
+    # 动态调整称呼
+    if random_sex == 0:  # 如果是女性
+        if my_daughter_prefix == '女儿':
+            my_daughter_wife_prefix = '女婿a'
+            my_daughter_prefix = '女儿a'
+            my_daughter2_wife_prefix = '女婿b'
+            my_daughter2_prefix = '女儿b'
+        else:
+            my_daughter2_wife_prefix = '女婿'
+            my_daughter2_prefix = '女儿'
+    else:  # 如果是男性
+        if my_daughter_prefix == '儿子':
+            my_daughter_wife_prefix = '儿媳a'
+            my_daughter_prefix = '儿子a'
+            my_daughter2_wife_prefix = '儿媳b'
+            my_daughter2_prefix = '儿子b'
+        else:
+            my_daughter2_wife_prefix = '儿媳'
+            my_daughter2_prefix = '儿子'
 
-    my_granddaughter_snapshot = await get_wife_snapshot()
+
+    # 随机获取性别
+    random_sex = random.randint(0, 1)
+    my_granddaughter_snapshot = await get_wife_snapshot(sex=random_sex)
     my_granddaughter_avatar = my_granddaughter_snapshot.image_data
     my_granddaughter_id = my_granddaughter_snapshot.image_name.split("snapshot")[0]
+    # 动态调整称呼
+    if random_sex == 0:  # 如果是女性
+        if '女儿' in my_daughter_prefix:
+            my_granddaughter_prefix = '外孙女'
+        else:
+            my_granddaughter_prefix = '孙女'
+    else:  # 如果是男性
+        if '女儿' in my_daughter_prefix:
+            my_granddaughter_prefix = '外孙子'
+        else:
+            my_granddaughter_prefix = '孙子'
 
-    my_granddaughter2_snapshot = await get_wife_snapshot()
+    # 随机获取性别
+    random_sex = random.randint(0, 1)
+    my_granddaughter2_snapshot = await get_wife_snapshot(sex=random_sex)
     my_granddaughter2_avatar = my_granddaughter2_snapshot.image_data
     my_granddaughter2_id = my_granddaughter2_snapshot.image_name.split("snapshot")[0]
+    # 动态调整称呼
+    if random_sex == 0:  # 如果是女性
+        if '女儿' in my_daughter2_prefix:
+            if my_granddaughter_prefix == '外孙女':
+                my_granddaughter_prefix = '外孙女a'
+                my_granddaughter2_prefix = '外孙女b'
+            else:
+                my_granddaughter2_prefix = '外孙女'
+        else:
+            if my_granddaughter_prefix == '孙女':
+                my_granddaughter_prefix = '孙女a'
+                my_granddaughter2_prefix = '孙女b'
+            else:
+                my_granddaughter2_prefix = '孙女'
+    else:  # 如果是男性
+        if '女儿' in my_daughter2_prefix:
+            if my_granddaughter_prefix == '外孙子':
+                my_granddaughter_prefix = '外孙子a'
+                my_granddaughter2_prefix = '外孙子b'
+            else:
+                my_granddaughter2_prefix = '外孙子'
+        else:
+            if my_granddaughter_prefix == '孙子':
+                my_granddaughter_prefix = '孙子a'
+                my_granddaughter2_prefix = '孙子b'
+            else:
+                my_granddaughter2_prefix = '孙子'
+
     # 4、生成关系图、关系文本
     avatar_data = []
     avatar_data.append(my_avatar)
@@ -336,8 +414,8 @@ async def _(event: MessageEvent):
 
     avatar_data.append(my_daughter_wife_avatar)
     avatar_data.append(my_daughter_avatar)
-    avatar_data.append(my_daughter2_wife_avatar)
     avatar_data.append(my_daughter2_avatar)
+    avatar_data.append(my_daughter2_wife_avatar)
 
     avatar_data.append(my_granddaughter_avatar)
     avatar_data.append(my_granddaughter2_avatar)
@@ -345,12 +423,12 @@ async def _(event: MessageEvent):
     relation_pic = await s.process_image(avatar_data, user_name)
     avatar_desc = f'祝贺你喜添家丁！你的家庭成员具体ID如下：\n' \
                   f'配偶：{my_wife_id}\n' \
-                  f'儿媳/女婿a：{my_daughter_wife_id}\n' \
-                  f'儿子/儿女a：{my_daughter_id}\n' \
-                  f'儿子/儿女b：{my_daughter2_id}\n' \
-                  f'儿媳/女婿b：{my_daughter2_wife_id}\n' \
-                  f'孙子/孙女a：{my_granddaughter_id}\n' \
-                  f'孙子/孙女b：{my_granddaughter2_id}'
+                  f'{my_daughter_wife_prefix}：{my_daughter_wife_id}\n' \
+                  f'{my_daughter_prefix}：{my_daughter_id}\n' \
+                  f'{my_daughter2_prefix}：{my_daughter2_id}\n' \
+                  f'{my_daughter2_wife_prefix}：{my_daughter2_wife_id}\n' \
+                  f'{my_granddaughter_prefix}：{my_granddaughter_id}\n' \
+                  f'{my_granddaughter2_prefix}：{my_granddaughter2_id}'
 
     # 更新数据
     # new_data = {
